@@ -375,29 +375,6 @@ function U.open_floating_terminal(command_or_opts, filetype, ispreupdate, autocl
 	end
 end
 
---- Timer function to run a function periodically
----@param fn function The function to run
-local timer = function(fn)
-	local function timedFn()
-		local wait = fn()
-		vim.defer_fn(timedFn, wait)
-	end
-	timedFn()
-end
-
---- Function to set up an update timer
----@param interval number The interval to wait before checking for updates
-function U.update_timer(interval)
-	timer(function()
-		local default_config = require("nvim_updater").default_config
-		U.get_commit_count()
-		if default_config.notify_updates then
-			require("nvim_updater").notify_new_commits({ show_none = false, level = vim.log.levels.INFO })
-		end
-		return interval * 1000
-	end)
-end
-
 --- Helper function to check if a plugin is installed
 ---@function is_installed
 ---@param plugin string The name of the plugin to check

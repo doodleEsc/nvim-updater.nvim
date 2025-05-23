@@ -46,7 +46,7 @@ local function check()
 	local user_config = require("nvim_updater").default_config or {}
 	local source_dir = user_config.source_dir or "~/.local/src/neovim"
 	source_dir = fn.expand(source_dir)
-	local branch = user_config.tag or "master"
+	local tag = user_config.tag or "stable"
 
 	-- Directory Existence Check
 	if fn.isdirectory(source_dir) == 1 then
@@ -80,12 +80,19 @@ local function check()
 		end
 	end
 
-	-- Remote Branch Existence Check
-	local git_output = fn.systemlist("git ls-remote --heads https://github.com/neovim/neovim " .. branch)
-	if fn.empty(git_output) == 1 then
-		health.error("Branch '" .. branch .. "' does not exist on the Neovim GitHub repo!")
+	-- Remote Tag Existence Check
+	local git_output = fn.systemlist("git ls-remote --tags https://github.com/neovim/neovim " .. tag)
+	local tag_exists = false
+	for _, line in ipairs(git_output) do
+		if line:match("tags/" .. tag .. "$") then
+			tag_exists = true
+			break
+		end
+	end
+	if tag_exists then
+		health.ok("Remote tag exists: " .. tag)
 	else
-		health.ok("Remote branch exists: " .. branch)
+		health.error("Tag '" .. tag .. "' does not exist on the Neovim GitHub repo!")
 	end
 end
 

@@ -11,7 +11,6 @@ P.default_config = {
 	source_dir = vim.fn.expand("~/.local/src/neovim"), -- Default Neovim source location
 	build_type = "Release", -- Default build type
 	tag = "stable", -- Default Neovim branch to track
-	notify_updates = false, -- Enable update notification
 	verbose = false, -- Default verbose mode
 	default_keymaps = false, -- Use default keymaps
 	build_fresh = true, -- Always remove build dir before building
@@ -86,12 +85,6 @@ local function setup_default_keymaps()
 	setup_user_friendly_keymaps() -- Set up user-friendly mappings
 end
 
---- Show new commits then perform update
----@function update_with_changes
-function P.update_with_changes()
-	P.show_new_commits(true)
-end
-
 --- Helper function to retry update
 local function update_with_retry()
 	if P.last_status.retry then
@@ -109,12 +102,12 @@ function P.update_neovim(opts)
 	local build_type = opts.build_type ~= "" and opts.build_type or P.default_config.build_type
 	local tag = opts.tag ~= "" and opts.tag or P.default_config.tag
 
-	if P.default_config.build_fresh then
-		if utils.directory_exists(source_dir .. "/build") then
-			utils.rm_build_then_update(opts)
-			return
-		end
-	end
+	-- if P.default_config.build_fresh then
+	-- 	if utils.directory_exists(source_dir .. "/build") then
+	-- 		utils.rm_build_then_update(opts)
+	-- 		return
+	-- 	end
+	-- end
 
 	local notification_msg = "Starting Neovim update...\nSource: "
 		.. source_dir
@@ -128,20 +121,19 @@ function P.update_neovim(opts)
 	local git_commands = ""
 
 	if not dir_exists then
-		git_commands = "git clone https://github.com/neovim/neovim " .. source_dir .. " && cd " .. source_dir
+		git_commands = "git clone https://github.com/neovim/neovim " .. source_dir .. " && cd " .. source_dir .. " && "
 	else
 		-- Check if we're in a git repo and get current branch
-		git_commands = "cd " .. source_dir .. " && git fetch origin && "
-
-		-- Only switch tag if we're not already on the target tag
-		git_commands = git_commands .. 'test "$(git rev-parse --abbrev-ref HEAD)" = "' .. tag .. '" || '
-		git_commands = git_commands .. "git switch --detach " .. tag .. " && "
-		git_commands = git_commands .. "git pull"
+		git_commands = "cd " .. source_dir .. " && git fetch origin && git pull && "
 	end
+
+	-- Only switch tag if we're not already on the target tag
+	git_commands = git_commands .. 'test "$(git rev-parse --abbrev-ref HEAD)" = "' .. tag .. '" || '
+	git_commands = git_commands .. "git switch --detach " .. tag
 
 	local build_command = "cd " .. source_dir .. " && make CMAKE_BUILD_TYPE=" .. build_type .. " && sudo make install"
 
-	local update_command = git_commands .. " && " .. build_command
+	local update_command = git_commands .. " && " .. build_command .. " && " .. "git checkout master"
 
 	-- Use the open_floating_terminal from the 'utils' module
 	utils.open_floating_terminal({
@@ -360,248 +352,17 @@ function P.get_statusline()
 	return status
 end
 
----@class NVNoticeOpts
----@field show_none boolean|table Optional. If a boolean, determines whether to show a notification if there are no new commits.
----@field level number Optional. The log level to use for the notification. Only used if `show_none` is a boolean.
-
---- Check for new commits and create a notification if there are any.
---- Can be called with either positional arguments or a table of options.
---- @param show_none boolean|NVNoticeOpts Optional.
----   If a boolean, determines whether to show a notification if there are no new commits.
----   If a table, it can contain `show_none` and `level` options.
---- @param level? number Optional.
----   The log level to use for the notification. Only used if `show_none` is a boolean.
-function P.notify_new_commits(show_none, level)
-	-- If the first argument is a table, treat it as an options table.
-	if type(show_none) == "table" then
-		local opts = show_none
-		show_none = opts.show_none
-		level = opts.level
-	end
-	-- Set default value for show_none to true
-	if show_none == nil then
-		show_none = true
-	end
-
-	-- Set default value for level to INFO
-	if level == nil then
-		level = vim.log.levels.INFO
-	end
-
-	-- Define the path to the Neovim source directory
-	local source_dir = P.default_config.source_dir
-
-	-- Build the command to fetch the latest changes from the remote repository
-	local fetch_command = ("cd %s && git fetch"):format(source_dir)
-
-	-- Execute the fetch command
-	vim.fn.system(fetch_command)
-
-	-- Build the command to get the current branch name
-	local current_branch_cmd = ("cd %s && git rev-parse --abbrev-ref HEAD"):format(source_dir)
-
-	local current_branch = vim.fn.system(current_branch_cmd):gsub("%s+", "") -- Trim whitespace
-
-	-- Build the command to count new commits in the remote branch
-	local commit_count_cmd = ("cd %s && git rev-list --count %s..origin/%s"):format(
-		source_dir,
-		current_branch,
-		current_branch
-	)
-
-	-- Execute the command to get the count of new commits
-	local commit_count = vim.fn.system(commit_count_cmd):gsub("%s+", "") -- Trim whitespace
-
-	-- Check for errors in executing the command
-	if vim.v.shell_error == 0 then
-		if tonumber(commit_count) > 0 then
-			-- Adjust the notification message based on the number of commits found
-			local commit_word = tonumber(commit_count) == 1 and "commit" or "commits"
-			utils.notify(("%d new Neovim %s."):format(tonumber(commit_count), commit_word), level, true)
-		else
-			if show_none then
-				utils.notify("No new Neovim commits.", level, true)
-			end
-		end
-	else
-		utils.notify("Failed to count new Neovim commits.", vim.log.levels.ERROR)
-	end
-end
-
----@class NVCommitsOpts
----@field isupdate boolean True if this is part of an update
----@field short boolean True to only show short commit messages
-
---- Show commits that exist in the remote branch but not in the local branch.
---- @param isupdate? boolean|NVCommitsOpts Optional. If a boolean, determines whether to update the commit list.
----   If a table, it can contain `isupdate` and `short` options.
---- @param short? boolean Optional. Whether to show a short commit list. Only used if `isupdate` is a boolean.
-function P.show_new_commits(isupdate, short)
-	-- If the first argument is a table, treat it as an options table.
-	local doupdate = false
-	if type(isupdate) == "table" then
-		local opts = isupdate
-		doupdate = opts.isupdate
-		short = opts.short
-		isupdate = opts.isupdate
-	end
-	-- Define the path to the Neovim source directory
-	local source_dir = P.default_config.source_dir
-
-	-- Set short default to true
-	local shortmessage = "--decorate=short "
-	if short == nil then
-		short = true
-	end
-
-	-- Build the command to fetch the latest changes from the remote repository
-	local fetch_command = ("cd %s && git fetch"):format(source_dir)
-
-	-- Execute the fetch command
-	vim.fn.system(fetch_command)
-
-	-- Build the git command to show commits that are in the remote branch but not in local
-	local current_branch_cmd = ("cd %s && git rev-parse --abbrev-ref HEAD"):format(source_dir)
-
-	local current_branch = vim.fn.system(current_branch_cmd):gsub("%s+", "") -- Trim whitespace
-
-	-- Build the command to count new commits in the remote branch
-	local commit_count_cmd = ("cd %s && git rev-list --count %s..origin/%s"):format(
-		source_dir,
-		current_branch,
-		current_branch
-	)
-
-	-- Set up shortmessage
-	if short then
-		shortmessage = "--decorate=short --pretty=oneline "
-	end
-
-	-- Execute the command to get the count of new commits
-	local commit_count = vim.fn.system(commit_count_cmd):gsub("%s+", "") -- Trim whitespace
-
-	-- Check for errors in executing the command
-	if vim.v.shell_error == 0 then
-		if tonumber(commit_count) > 0 then
-			-- Display the commit logs
-			utils.notify("Opening Neovim changes in terminal", vim.log.levels.INFO)
-			-- Open the terminal in a new window
-			local term_command = ("cd %s && git --no-pager log %s%s..origin/%s"):format(
-				source_dir,
-				shortmessage,
-				current_branch,
-				current_branch
-			)
-			utils.open_floating_terminal({
-				command = term_command,
-				filetype = "neovim_updater_term.changes",
-				ispreupdate = false,
-				autoclose = false,
-				callback = function()
-					if doupdate then
-						utils.ConfirmPrompt("Perform Neovim update?", function()
-							P.update_neovim()
-						end)
-					end
-				end,
-			})
-		else
-			utils.notify("No new Neovim commits.", vim.log.levels.INFO, true)
-			-- Update status count
-			P.last_status.count = "0"
-		end
-	else
-		utils.notify("Failed to retrieve commit logs.", vim.log.levels.ERROR)
-	end
-end
-
---- Show commits that exist in the remote branch but not in the local branch.
-function P.show_new_commits_in_diffview()
-	-- Check for diffview plugin
-	-- If not installed, fallback to using the floating terminal window
-	if not utils.is_installed("diffview") then
-		utils.notify("DiffView plugin not found.", vim.log.levels.ERROR)
-		P.show_new_commits()
-		return
-	end
-	-- Define the path to the Neovim source directory
-	local source_dir = P.default_config.source_dir
-
-	-- Build the command to fetch the latest changes from the remote repository
-	local fetch_command = ("cd %s && git fetch"):format(source_dir)
-
-	-- Execute the fetch command
-	vim.fn.system(fetch_command)
-
-	-- Build the git command to show commits that are in the remote branch but not in local
-	local current_branch_cmd = ("cd %s && git rev-parse --abbrev-ref HEAD"):format(source_dir)
-
-	local current_branch = vim.fn.system(current_branch_cmd):gsub("%s+", "") -- Trim whitespace
-
-	-- Check for errors in executing the command
-	if vim.v.shell_error == 0 then
-		utils.notify("Opening Neovim changes in Diffview", vim.log.levels.INFO)
-		vim.cmd(":DiffviewOpen HEAD...origin/" .. current_branch .. " -C=" .. source_dir)
-		require("diffview.actions").open_commit_log()
-	else
-		utils.notify("Failed to retrieve commit logs.", vim.log.levels.ERROR)
-	end
-end
-
---- Show commits that exist in the remote branch but not in the local branch.
-function P.show_new_commits_in_telescope()
-	-- Check for telescope plugin
-	-- If not installed, fallback to using the floating terminal window
-	if not utils.is_installed("telescope") then
-		utils.notify("Telescope plugin not found.", vim.log.levels.ERROR)
-		P.show_new_commits()
-		return
-	end
-
-	-- Define the path to the Neovim source directory
-	local source_dir = P.default_config.source_dir
-
-	-- Build the command to fetch the latest changes from the remote repository
-	local fetch_command = ("cd %s && git fetch"):format(source_dir)
-
-	-- Execute the fetch command
-	vim.fn.system(fetch_command)
-
-	-- Build the git command to show commits that are in the remote branch but not in local
-	local current_branch_cmd = ("cd %s && git rev-parse --abbrev-ref HEAD"):format(source_dir)
-
-	local current_branch = vim.fn.system(current_branch_cmd):gsub("%s+", "") -- Trim whitespace
-
-	-- Setup the git command for telescope
-	local tele_command = ("git log HEAD...origin/%s --pretty=oneline --abbrev-commit -- ."):format(current_branch)
-
-	-- Make it a table like telescope prefers
-	local tele_cmd = vim.split(tele_command, " ")
-
-	-- Get the telescope picker
-	local builtin = require("telescope.builtin")
-
-	-- Notify
-	utils.notify("Opening Neovim changes in Diffview", vim.log.levels.INFO)
-
-	-- Use Telescope's built-in git_commits picker to show commits
-	builtin.git_commits({
-		cwd = source_dir, -- Set current working directory to the Neovim source
-		git_command = tele_cmd,
-	})
-end
-
 --- Create user commands for both updating and removing Neovim source directories
 ---@function P.setup_usercmd
 function P.setup_usercmds()
 	--- Define NVUpdateNeovim command to accept branch, build_type, and source_dir as optional arguments
 	vim.api.nvim_create_user_command("NVUpdateNeovim", function(opts)
 		local args = vim.split(opts.args, " ")
-		local branch = (args[1] == "" and P.default_config.tag or args[1])
+		local tag = (args[1] == "" and P.default_config.tag or args[1])
 		local build_type = (args[2] == "" and P.default_config.build_type or args[2])
 		local source_dir = (args[3] == "" and P.default_config.source_dir or args[3])
 
-		P.update_neovim({ branch = branch, build_type = build_type, source_dir = source_dir })
+		P.update_neovim({ tag = tag, build_type = build_type, source_dir = source_dir })
 	end, {
 		desc = "Update Neovim with optional branch, build_type, and source_dir",
 		nargs = "*", -- Accept multiple (optional) arguments
@@ -611,9 +372,9 @@ function P.setup_usercmds()
 	vim.api.nvim_create_user_command("NVUpdateCloneSource", function(opts)
 		local args = vim.split(opts.args, " ")
 		local source_dir = (args[1] == "" and P.default_config.source_dir or args[1])
-		local branch = (args[2] == "" and P.default_config.tag or args[2])
+		local tag = (args[2] == "" and P.default_config.tag or args[2])
 
-		P.generate_source_dir({ source_dir = source_dir, branch = branch })
+		P.generate_source_dir({ source_dir = source_dir, tag = tag })
 	end, {
 		desc = "Clone Neovim source directory with optional branch",
 		nargs = "*", -- Accept multiple (optional) arguments
@@ -642,16 +403,6 @@ function P.setup(user_config)
 
 	-- Setup Neovim user commands
 	P.setup_usercmds()
-
-	-- Schedule async update check
-	if P.default_config.check_for_updates then
-		vim.defer_fn(function()
-			utils.get_commit_count()
-			if P.default_config.update_interval > 0 then
-				utils.update_timer(P.default_config.update_interval)
-			end
-		end, 50)
-	end
 end
 
 return P
