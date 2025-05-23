@@ -46,7 +46,7 @@ local function check()
 	local user_config = require("nvim_updater").default_config or {}
 	local source_dir = user_config.source_dir or "~/.local/src/neovim"
 	source_dir = fn.expand(source_dir)
-	local branch = user_config.branch or "master"
+	local branch = user_config.tag or "master"
 
 	-- Directory Existence Check
 	if fn.isdirectory(source_dir) == 1 then

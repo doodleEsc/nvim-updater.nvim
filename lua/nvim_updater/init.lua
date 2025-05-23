@@ -9,10 +9,8 @@ local utils = require("nvim_updater.utils")
 -- Default values for plugin options (editable via user config)
 P.default_config = {
 	source_dir = vim.fn.expand("~/.local/src/neovim"), -- Default Neovim source location
-	build_type = "RelWithDebInfo", -- Default build type
-	branch = "master", -- Default Neovim branch to track
-	check_for_updates = false, -- Checks for new updates automatically
-	update_interval = (60 * 60 * 6), -- Update interval in seconds (6 hours)
+	build_type = "Release", -- Default build type
+	tag = "stable", -- Default Neovim branch to track
 	notify_updates = false, -- Enable update notification
 	verbose = false, -- Default verbose mode
 	default_keymaps = false, -- Use default keymaps
@@ -47,18 +45,6 @@ local function setup_plug_keymaps()
 	vim.keymap.set("n", "<Plug(NVUpdateCloneSource)", function()
 		P.generate_source_dir()
 	end, { desc = "Generate Neovim source directory via <Plug>", noremap = false, silent = true })
-
-	vim.keymap.set("n", "<Plug>(NVUpdateShowNewCommits)", function()
-		P.show_new_commits()
-	end, { desc = "Show new commits via <Plug>", noremap = false, silent = true })
-
-	vim.keymap.set("n", "<Plug>(NVUpdateShowNewDiffs)", function()
-		P.show_new_commits_in_diffview()
-	end, { desc = "Show new diffs via <Plug>", noremap = false, silent = true })
-
-	vim.keymap.set("n", "<Plug>(NVUpdatePickNewCommits)", function()
-		P.show_new_commits_in_telescope()
-	end, { desc = "Show new diffs via <Plug>", noremap = false, silent = true })
 end
 
 --- Setup user-friendly key mappings for updating Neovim or removing source.
@@ -90,13 +76,6 @@ local function setup_user_friendly_keymaps()
 			"<Plug>(NVUpdateRemoveSource)",
 			{ desc = "Remove Neovim source directory", noremap = true, silent = true }
 		)
-
-		vim.keymap.set(
-			"n",
-			"<Leader>un",
-			"<Plug>(NVUpdateShowNewCommits)",
-			{ desc = "Show new commits in terminal", noremap = true, silent = true }
-		)
 	end
 end
 
@@ -123,12 +102,12 @@ local function update_with_retry()
 end
 
 --- Update Neovim from source and show progress in a floating terminal.
----@param opts table|nil Optional options for the update process (branch, build_type, etc.)
+---@param opts table|nil Optional options for the update process (tag, build_type, etc.)
 function P.update_neovim(opts)
 	opts = opts or {}
 	local source_dir = opts.source_dir ~= "" and opts.source_dir or P.default_config.source_dir
 	local build_type = opts.build_type ~= "" and opts.build_type or P.default_config.build_type
-	local branch = opts.branch ~= "" and opts.branch or P.default_config.branch
+	local tag = opts.tag ~= "" and opts.tag or P.default_config.tag
 
 	if P.default_config.build_fresh then
 		if utils.directory_exists(source_dir .. "/build") then
@@ -139,8 +118,8 @@ function P.update_neovim(opts)
 
 	local notification_msg = "Starting Neovim update...\nSource: "
 		.. source_dir
-		.. "\nBranch: "
-		.. branch
+		.. "\\Tag: "
+		.. tag
 		.. "\nBuild: "
 		.. build_type
 	utils.notify(notification_msg, vim.log.levels.INFO)
@@ -153,10 +132,10 @@ function P.update_neovim(opts)
 	else
 		-- Check if we're in a git repo and get current branch
 		git_commands = "cd " .. source_dir .. " && git fetch origin && "
-		
-		-- Only switch branch if we're not already on the target branch
-		git_commands = git_commands .. "test \"$(git rev-parse --abbrev-ref HEAD)\" = \"" .. branch .. "\" || "
-		git_commands = git_commands .. "git switch " .. branch .. " && "
+
+		-- Only switch tag if we're not already on the target tag
+		git_commands = git_commands .. 'test "$(git rev-parse --abbrev-ref HEAD)" = "' .. tag .. '" || '
+		git_commands = git_commands .. "git switch --detach " .. tag .. " && "
 		git_commands = git_commands .. "git pull"
 	end
 
@@ -303,14 +282,14 @@ function P.generate_source_dir(opts)
 	-- Define the source
 	local source_dir = opts.source_dir ~= "" and opts.source_dir or P.default_config.source_dir
 	local repo = "https://github.com/neovim/neovim.git"
-	local branch = opts.branch ~= "" and opts.branch or P.default_config.branch
+	local tag = opts.tag ~= "" and opts.tag or P.default_config.tag
 
 	if not utils.directory_exists(source_dir) then
 		-- Build the command to fetch the latest changes from the remote repository
 		local fetch_command = ("cd ~ && git clone %s %s"):format(repo, source_dir)
 
-		-- Checkout the branch
-		local checkout_command = "cd " .. source_dir .. " && git checkout " .. branch
+		-- Checkout the tag
+		local checkout_command = "cd " .. source_dir .. " && git checkout " .. tag
 
 		-- Combine commands
 		local complete_command = fetch_command .. " && " .. checkout_command
@@ -618,7 +597,7 @@ function P.setup_usercmds()
 	--- Define NVUpdateNeovim command to accept branch, build_type, and source_dir as optional arguments
 	vim.api.nvim_create_user_command("NVUpdateNeovim", function(opts)
 		local args = vim.split(opts.args, " ")
-		local branch = (args[1] == "" and P.default_config.branch or args[1])
+		local branch = (args[1] == "" and P.default_config.tag or args[1])
 		local build_type = (args[2] == "" and P.default_config.build_type or args[2])
 		local source_dir = (args[3] == "" and P.default_config.source_dir or args[3])
 
@@ -632,7 +611,7 @@ function P.setup_usercmds()
 	vim.api.nvim_create_user_command("NVUpdateCloneSource", function(opts)
 		local args = vim.split(opts.args, " ")
 		local source_dir = (args[1] == "" and P.default_config.source_dir or args[1])
-		local branch = (args[2] == "" and P.default_config.branch or args[2])
+		local branch = (args[2] == "" and P.default_config.tag or args[2])
 
 		P.generate_source_dir({ source_dir = source_dir, branch = branch })
 	end, {
@@ -650,28 +629,7 @@ function P.setup_usercmds()
 		desc = "Remove Neovim source directory (optionally specify custom path)",
 		nargs = "?", -- Allow one optional argument
 	})
-
-	--- Define NVUpdateShowNewCommits command to show new commits in the terminal
-	vim.api.nvim_create_user_command("NVUpdateShowNewCommits", function()
-		P.show_new_commits()
-	end, {
-		desc = "Show new commits in terminal",
-	})
-
-	--- Define NVUpdateShowNewDiffs command to show new commits in Diffview
-	vim.api.nvim_create_user_command("NVUpdateShowNewDiffs", function()
-		P.show_new_commits_in_diffview()
-	end, {
-		desc = "Show new commits in Diffview",
-	})
 end
-
--- Define NVUpdatePickNewCommits command to pick new commits in telescope
-vim.api.nvim_create_user_command("NVUpdatePickNewCommits", function()
-	P.show_new_commits_in_telescope()
-end, {
-	desc = "Pick new commits in telescope",
-})
 
 --- Initialize Neovim updater plugin configuration
 ---@function P.setup

@@ -375,43 +375,6 @@ function U.open_floating_terminal(command_or_opts, filetype, ispreupdate, autocl
 	end
 end
 
---- Helper function to return the number of pending commits
----@function get_update_status
-function U.get_commit_count()
-	-- Define the path to the Neovim source directory
-	local source_dir = require("nvim_updater").default_config.source_dir
-
-	-- Build the command to fetch the latest changes from the remote repository
-	local fetch_command = ("cd %s && git fetch"):format(source_dir)
-
-	-- Execute the fetch command
-	vim.fn.system(fetch_command)
-
-	-- Build the command to get the current branch name
-	local current_branch_cmd = ("cd %s && git rev-parse --abbrev-ref HEAD"):format(source_dir)
-
-	local current_branch = vim.fn.system(current_branch_cmd):gsub("%s+", "") -- Trim whitespace
-
-	-- Check for errors in executing the branch command
-	if vim.v.shell_error ~= 0 then
-		return "?"
-	end
-
-	-- Build the command to count new commits in the remote branch
-	local commit_count_cmd = ("cd %s && git rev-list --count %s..origin/%s"):format(
-		source_dir,
-		current_branch,
-		current_branch
-	)
-
-	-- Execute the command to get the count of new commits
-	local commit_count = vim.fn.system(commit_count_cmd):gsub("%s+", "") -- Trim whitespace
-
-	-- Update cached status
-	require("nvim_updater").last_status.count = commit_count
-	return commit_count
-end
-
 --- Timer function to run a function periodically
 ---@param fn function The function to run
 local timer = function(fn)
