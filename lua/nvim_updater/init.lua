@@ -1,10 +1,10 @@
 -- lua/nvim_updater/init.lua
 
--- Define the Neovim updater plugin
-local P = {}
-
 -- Import the 'utils' module for helper functions
 local utils = require("nvim_updater.utils")
+
+-- Define the Neovim updater plugin
+local P = {}
 
 -- Default values for plugin options (editable via user config)
 P.default_config = {
@@ -14,6 +14,7 @@ P.default_config = {
 	verbose = false, -- Default verbose mode
 	default_keymaps = false, -- Use default keymaps
 	build_fresh = true, -- Always remove build dir before building
+	env = {}, -- Additional environment variables for commands
 }
 
 P.last_status = {
@@ -102,13 +103,6 @@ function P.update_neovim(opts)
 	local build_type = opts.build_type ~= "" and opts.build_type or P.default_config.build_type
 	local tag = opts.tag ~= "" and opts.tag or P.default_config.tag
 
-	-- if P.default_config.build_fresh then
-	-- 	if utils.directory_exists(source_dir .. "/build") then
-	-- 		utils.rm_build_then_update(opts)
-	-- 		return
-	-- 	end
-	-- end
-
 	local notification_msg = "Starting Neovim update...\nSource: "
 		.. source_dir
 		.. "\\Tag: "
@@ -131,7 +125,12 @@ function P.update_neovim(opts)
 	git_commands = git_commands .. 'test "$(git rev-parse --abbrev-ref HEAD)" = "' .. tag .. '" || '
 	git_commands = git_commands .. "git switch --detach " .. tag
 
-	local build_command = "cd " .. source_dir .. " && make CMAKE_BUILD_TYPE=" .. build_type .. " && sudo make install"
+	local build_command = "cd "
+		.. source_dir
+		.. " && make distclean"
+		.. " && make CMAKE_BUILD_TYPE="
+		.. build_type
+		.. " && sudo make install"
 
 	local update_command = git_commands .. " && " .. build_command .. " && " .. "git checkout master"
 
@@ -142,6 +141,7 @@ function P.update_neovim(opts)
 		ispreupdate = false,
 		autoclose = true,
 		enter_insert = true,
+		env = P.default_config.env, -- Pass environment variables
 		callback = function(results)
 			if results.result_code ~= 0 then
 				utils.notify("Neovim update failed with error code: " .. results.result_code, vim.log.levels.ERROR)

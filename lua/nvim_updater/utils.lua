@@ -168,6 +168,7 @@ end
 ---@field autoclose? boolean Whether the terminal should be automatically closed (optional)
 ---@field callback? fun(params?: TerminalCloseParams) Callback function to run after the terminal is closed
 ---@field enter_insert? boolean Whether to enter insert mode immediately (optional)
+---@field env? table Additional environment variables for the command (optional)
 
 --- Callback parameter table for the floating terminal close event.
 ---@class TerminalCloseParams
@@ -186,7 +187,8 @@ end
 ---@param autoclose? boolean Whether the terminal should be automatically closed (optional if using positional arguments)
 ---@param callback? fun(params?: TerminalCloseParams) Callback function to run after the terminal is closed
 ---@param enter_insert? boolean Whether to enter insert mode immediately (optional if using positional arguments)
-function U.open_floating_terminal(command_or_opts, filetype, ispreupdate, autoclose, callback, enter_insert)
+---@param env? table Additional environment variables for the command (optional if using positional arguments)
+function U.open_floating_terminal(command_or_opts, filetype, ispreupdate, autoclose, callback, enter_insert, env)
 	local opts
 	local result_code = -1 -- Indicates the command is still running
 	local output_lines = {} -- Store terminal output lines
@@ -202,6 +204,7 @@ function U.open_floating_terminal(command_or_opts, filetype, ispreupdate, autocl
 			autoclose = autoclose or false,
 			callback = callback or nil,
 			enter_insert = enter_insert or false,
+			env = env or {},
 		}
 	end
 
@@ -214,6 +217,7 @@ function U.open_floating_terminal(command_or_opts, filetype, ispreupdate, autocl
 		return true
 	end
 	enter_insert = opts.enter_insert or false
+	env = opts.env or {}
 
 	-- Create a new buffer for the terminal, set it as non-listed and scratch
 	local buf = vim.api.nvim_create_buf(false, true)
@@ -295,6 +299,7 @@ function U.open_floating_terminal(command_or_opts, filetype, ispreupdate, autocl
 	-- Run the terminal command
 	vim.fn.jobstart(command, {
 		term = true, -- Use terminal mode
+		env = env,
 		on_stdout = function(_, data)
 			if data then
 				for _, line in ipairs(data) do
@@ -375,30 +380,4 @@ function U.open_floating_terminal(command_or_opts, filetype, ispreupdate, autocl
 	end
 end
 
---- Helper function to check if a plugin is installed
----@function is_installed
----@param plugin string The name of the plugin to check
----@return boolean is_installed True if the plugin is installed, false otherwise
-function U.is_installed(plugin)
-	if pcall(require, plugin) then
-		return true
-	else
-		return false
-	end
-end
-
---- Helper function to remove the build directory and update Neovim
----@param opts table|nil Optional options for the update process
-function U.rm_build_then_update(opts)
-	opts = opts or {}
-	local default_config = require("nvim_updater").default_config
-	local source_dir = opts.source_dir ~= "" and opts.source_dir or default_config.source_dir
-	local build_dir = source_dir .. "/build"
-	local build_dir_exists = U.directory_exists(build_dir)
-	local source_dir_exists = U.directory_exists(source_dir)
-	if build_dir_exists and source_dir_exists then
-		require("nvim_updater").last_status.retry = true
-		require("nvim_updater").remove_source_dir({ source_dir = build_dir })
-	end
-end
 return U
