@@ -132,7 +132,7 @@ function P.update_neovim(opts)
 		.. build_type
 		.. " && sudo make install"
 
-	local update_command = git_commands .. " && " .. build_command .. " && " .. "git checkout master"
+	local update_command = git_commands .. " && " .. build_command
 
 	-- Use the open_floating_terminal from the 'utils' module
 	utils.open_floating_terminal({
