@@ -1,648 +1,238 @@
-# Neovim Updater Plugin
+# nvim-updater.nvim
 
 ![Lua](https://img.shields.io/badge/Made%20with%20Lua-blueviolet.svg?style=for-the-badge&logo=lua)
 [![nvim-updater.nvim](https://dotfyle.com/plugins/rootiest/nvim-updater.nvim/shield?style=for-the-badge)](https://dotfyle.com/plugins/rootiest/nvim-updater.nvim)
 
-This plugin allows you to easily update Neovim from source,
-with fully customizable options to define where the source is cloned,
-which branch is tracked, and the desired build type.
+A powerful Neovim plugin that allows you to effortlessly update Neovim from source with intelligent tag-based version management, optimized cloning strategies, and comprehensive build customization - all without leaving your editor.
 
-All without leaving Neovim.
+## ✨ 核心特性
 
-## Demo
+- **智能版本管理**: 支持稳定版本标签和开发分支的自动切换
+- **优化克隆策略**: 使用浅克隆技术减少下载时间和存储空间
+- **灵活构建系统**: 支持Release、Debug和RelWithDebInfo构建类型
+- **异步操作界面**: 所有操作都在浮动终端中异步执行，提供实时反馈
+- **智能错误处理**: 自动检测和处理各种Git状态和构建错误
+- **状态栏集成**: 提供丰富的状态栏组件用于显示更新状态
 
-[nvim-updater.webm](https://github.com/user-attachments/assets/dcf5dba0-837d-4ac5-9fb6-ef5a1bd2ae4a)
+## 📋 系统要求
 
-The above video shows an example of the update workflow with the Neovim Updater plugin.
-
-## 🔧 Prerequisites
-
-- A Linux system (macOS and Windows are not supported by this plugin)
-- [Neovim 0.9+](https://neovim.io/)
-  (earlier versions may work, but could encounter issues)
-- [Build prerequisites](https://github.com/neovim/neovim/blob/master/BUILD.md#build-prerequisites)
-  for your platform
+- **操作系统**: Linux系统（当前不支持macOS和Windows）
+- **Neovim版本**: 0.9+ （推荐0.10+）
+- **构建依赖**: 满足[Neovim构建前提条件](https://github.com/neovim/neovim/blob/master/BUILD.md#build-prerequisites)
+- **Git**: 用于源代码管理
+- **编译工具**: make, cmake, gcc/clang等
 
 > [!IMPORTANT]
-> It is recommended to uninstall any distro-provided neovim packages after
-> installing from source (with this plugin or manually) to prevent those
-> distro-packaged updates from overwriting the locally-built neovim binary.
+> 建议在使用此插件安装源码编译版本后，卸载发行版提供的neovim包，以防止包管理器更新覆盖本地编译的版本。
 
-### 📌 Optional Dependencies
+### 🔌 可选依赖
 
-These plugins are not required but can be used to extend functionality.
+- [diffview.nvim](https://github.com/sindrets/diffview.nvim) - 在DiffView中显示新提交
+- [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim) - 在Telescope中显示新提交
 
-- [diffview.nvim](https://github.com/sindrets/diffview.nvim)
-  This plugin can be used to show new commits in DiffView.
-- [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim)
-  This plugin can be used to show new commits in Telescope.
+## 📦 安装配置
 
-## 📦 Installation and Setup (with lazy.nvim)
-
-To use the plugin with [lazy.nvim](https://github.com/folke/lazy.nvim):
+### 使用 [lazy.nvim](https://github.com/folke/lazy.nvim)
 
 ```lua
 {
   "rootiest/nvim-updater.nvim",
-  version = "*", -- Pin to GitHub releases
+  version = "*", -- 锁定到GitHub releases
   config = function()
     require("nvim_updater").setup({
-      source_dir = "~/.local/src/neovim",  -- Custom target directory
-      build_type = "RelWithDebInfo",       -- Set the desired build type
-      branch = "master",                   -- Track nightly branch
-      check_for_updates = true,            -- Enable automatic update checks
-      notify_updates = true,               -- Enables update notifications
-      default_keymaps = false,             -- Disable default keymaps
+      source_dir = "~/.local/src/neovim",  -- 自定义源码目录
+      build_type = "Release",              -- 构建类型
+      tag = "stable",                      -- 跟踪稳定版本
+      default_keymaps = false,             -- 禁用默认按键映射
+      use_shallow_clone = true,            -- 使用浅克隆优化
+      update_before_switch = true,         -- 切换前更新源代码
     })
   end,
-  keys = { -- Custom keymappings
-    { -- Custom Update Neovim
-      "<Leader>cuU",
+  keys = { -- 自定义按键映射
+    {
+      "<Leader>nu",
       function()
         require('nvim_updater').update_neovim()
       end,
-      desc = "Custom Update Neovim"
+      desc = "更新Neovim"
     },
-    { -- Debug Build Neovim
-      "<Leader>cuD",
+    {
+      "<Leader>nd",
       function()
         require('nvim_updater').update_neovim({ build_type = 'Debug' })
       end,
-      desc = "Debug Build Neovim"
+      desc = "Debug构建Neovim"
     },
-    { -- Remove Neovim Source
-      "<Leader>cRN",
+    {
+      "<Leader>nr",
       ":NVUpdateRemoveSource<CR>",
-      desc = "Remove Neovim Source Directory",
+      desc = "删除Neovim源代码目录",
     },
   }
 }
 ```
 
-Minimal example with defaults in [lazy.nvim](https://github.com/folke/lazy.nvim):
+### 最小化配置
 
 ```lua
-  {
-    "rootiest/nvim-updater.nvim",
-    version = "*", -- Pin to GitHub releases
-    opts = {},
-  }
+{
+  "rootiest/nvim-updater.nvim",
+  version = "*",
+  opts = {},
+}
 ```
 
-Example with [packer.nvim](https://github.com/wbthomason/packer.nvim):
+### 使用 [packer.nvim](https://github.com/wbthomason/packer.nvim)
 
 ```lua
 use {
   "rootiest/nvim-updater.nvim",
-  tag = "*", -- Pin to GitHub releases
+  tag = "*",
   config = function()
     require("nvim_updater").setup({
-      source_dir = "~/.local/src/neovim",  -- Custom target directory
-      build_type = "RelWithDebInfo",       -- Set the desired build type
-      branch = "master",                   -- Track nightly branch
-      check_for_updates = true,            -- Enable automatic update checks
-      notify_updates = true,               -- Enables update notifications
-      default_keymaps = false,             -- Disable default keymaps
+      source_dir = "~/.local/src/neovim",
+      build_type = "Release",
+      tag = "stable",
+      default_keymaps = false,
     })
 
-    -- Define custom keymappings here
-    vim.keymap.set("n", "<Leader>cuU", function()
+    -- 自定义按键映射
+    vim.keymap.set("n", "<Leader>nu", function()
       require('nvim_updater').update_neovim()
-    end, { desc = "Custom Update Neovim" })
+    end, { desc = "更新Neovim" })
 
-    vim.keymap.set("n", "<Leader>cuD", function()
+    vim.keymap.set("n", "<Leader>nd", function()
       require('nvim_updater').update_neovim({ build_type = 'Debug' })
-    end, { desc = "Debug Build Neovim" })
+    end, { desc = "Debug构建Neovim" })
 
-    vim.keymap.set(
-      "n",
-      "<Leader>cRN",
-      ":NVUpdateRemoveSource<CR>",
-      { desc = "Remove Neovim Source Directory"
-    })
+    vim.keymap.set("n", "<Leader>nr", ":NVUpdateRemoveSource<CR>",
+      { desc = "删除Neovim源代码目录" })
   end,
 }
 ```
 
-Example with [vim-plug](https://github.com/junegunn/vim-plug):
+## ⚙️ 配置选项
 
-```lua
-Plug "rootiest/nvim-updater.nvim"
+### 核心配置
 
-lua << EOF
-require("nvim_updater").setup({
-  source_dir = "~/.local/src/neovim",  -- Custom target directory
-  build_type = "RelWithDebInfo",       -- Set the desired build type
-  branch = "master",                   -- Track nightly branch
-  check_for_updates = true,            -- Enable automatic update checks
-  notify_updates = true,               -- Enables update notifications
-  default_keymaps = false,             -- Disable default keymaps
-})
+| 选项              | 类型    | 默认值                  | 描述                                   |
+| ----------------- | ------- | ----------------------- | -------------------------------------- |
+| `source_dir`      | string  | `"~/.local/src/neovim"` | Neovim源代码目录路径                   |
+| `build_type`      | string  | `"Release"`             | 构建类型：Release/Debug/RelWithDebInfo |
+| `tag`             | string  | `"stable"`              | 目标版本标签或分支名                   |
+| `verbose`         | boolean | `false`                 | 启用详细输出                           |
+| `default_keymaps` | boolean | `false`                 | 启用默认按键映射                       |
 
--- Custom keybindings
-vim.api.nvim_set_keymap("n", "<Leader>cuU",
-  ":lua require('nvim_updater').update_neovim()<CR>",
-  { noremap = true, silent = true, desc = "Custom Update Neovim" })
+### 高级配置
 
-vim.api.nvim_set_keymap("n", "<Leader>cuD",
-  ":lua require('nvim_updater').update_neovim({ build_type = 'Debug' })<CR>",
-  { noremap = true, silent = true, desc = "Debug Build Neovim" })
+| 选项                   | 类型    | 默认值  | 描述                 |
+| ---------------------- | ------- | ------- | -------------------- |
+| `build_fresh`          | boolean | `true`  | 编译前清理构建目录   |
+| `force_update`         | boolean | `false` | 强制更新源代码       |
+| `update_before_switch` | boolean | `true`  | 切换版本前更新源代码 |
+| `use_shallow_clone`    | boolean | `true`  | 使用浅克隆优化       |
+| `env`                  | table   | `{}`    | 额外的环境变量       |
 
-vim.api.nvim_set_keymap("n", "<Leader>cRN",
-  ":NVUpdateRemoveSource<CR>",
-  { noremap = true, silent = true, desc = "Remove Neovim Source Directory" })
-EOF
+### 构建类型说明
+
+- **Release**: 优化的发布版本，无调试符号（推荐日常使用）
+- **Debug**: 包含完整调试符号，用于开发调试
+- **RelWithDebInfo**: 发布版本包含部分调试符号，平衡性能和调试能力
+
+### 版本标签说明
+
+- **stable**: 最新稳定版本
+- **v0.10.x**: 特定版本标签
+- **master**: 开发主分支（nightly构建）
+- **release-0.10**: 发布分支
+
+## 🎯 默认按键映射
+
+当启用`default_keymaps = true`时，插件提供以下默认按键：
+
+- `<Leader>uU`: 使用默认配置更新Neovim
+- `<Leader>uD`: 使用Debug构建更新Neovim
+- `<Leader>uR`: 使用Release构建更新Neovim
+- `<Leader>uC`: 删除Neovim源代码目录
+
+## 🔧 命令接口
+
+### 用户命令
+
+#### `:NVUpdateNeovim [tag] [build_type] [source_dir] [force]`
+
+更新Neovim，支持可选参数：
+
+```vim
+:NVUpdateNeovim                           " 使用默认配置
+:NVUpdateNeovim stable Release           " 指定版本和构建类型
+:NVUpdateNeovim v0.10.0 Debug ~/.local/src/neovim force
 ```
 
----
+#### `:NVUpdateCloneSource [source_dir] [tag]`
 
-### ✨ Features
+克隆Neovim源代码：
 
-- Clone, build, and install Neovim **from the source**.
-- Customizable **source path**, **build type**
-  (`Debug`, `Release`, `RelWithDebInfo`), and **branch**.
-- Provides default keybindings for quick actions or
-  define your own custom keymaps.
-- Integrates with **lualine** and statusline plugins via a
-  dedicated buffer **filetype** for customization and
-  a status component.
+```vim
+:NVUpdateCloneSource                      " 使用默认配置
+:NVUpdateCloneSource ~/.local/src/neovim stable
+```
 
-> [!TIP]
-> The plugin can integrate with `DiffView` and `Telescope` plugins
-> to display new commits in the Neovim source.
+#### `:NVUpdateRemoveSource [source_dir]`
 
----
+删除源代码目录：
 
-## ⚙️Configuration
+```vim
+:NVUpdateRemoveSource                     " 删除默认目录
+:NVUpdateRemoveSource ~/.local/src/neovim " 删除指定目录
+```
 
-The `setup` function accepts an optional table to configure the plugin’s behavior.
+### Lua API
 
-### Available Options
-
-- **`source_dir`**: Path to where the Neovim source is cloned.  
-  Default is `vim.fn.expand("~/.local/src/neovim")`.
-
-  The source directory path can be any valid path Neovim can write to.
-
-- **`build_type`**: The build type to use.  
-  Default is `"RelWithDebInfo"`.
-
-  Possible values are:  
-   `"Release"` - No debugging symbols.  
-   `"Debug"` - All debugging symbols.  
-   `"RelWithDebInfo"` - Release with common debugging symbols.
-
-- **`branch`**: The branch to track when cloning Neovim.  
-  Default is `"master"` (nightly).
-
-  The branch can be used to track the Neovim version.
-
-  Possible values are:  
-   `"master"` - Neovim nightly  
-   `"release-0.10"` - Neovim 0.10  
-   `"release-0.9"` - Neovim 0.9  
-   etc..
-
-- **`verbose`**: (boolean) Enable verbose output.  
-  Default is `false`.
-
-  When set to `false`, `INFO` and `DEBUG` notifications
-  from the plugin are suppressed.
-
-  Possible values are:  
-   `true` - Enable verbose output.  
-   `false` - Disable verbose output.
-
-- **`check_for_updates`**: (boolean) Enable automatic update checks.  
-  Default is `false`.
-
-  When set to `false`, the plugin will not check for updates automatically.
-
-  Possible values are:  
-   `true` - Enable automatic update checks.  
-   `false` - Disable automatic update checks.
-
-- **`update_interval`**: (number) Update interval in seconds.  
-  Default is `(60 * 60 * 6)` (6 hours).
-
-  The update interval is the time between checks for new commits in the
-  neovim source repository.
-
-  Possible values are:  
-   `number` - Update interval in seconds.
-
-- **`notify_updates`**: (boolean) Produce update notifications  
-  Default is `false`.
-
-  Possible values are:  
-  `true` - Produce update notifications at update_interval.
-  `false` - Do not produce update notifications.
-
-- **`build_fresh`**: (boolean) Remove the build directory before compiling.  
-  Default is `true`.
-
-  Possible values are:  
-   `true` - Always remove the build directory before compiling.  
-   `false` - Do not remove the build directory before compiling.
-
-- **`default_keymaps`**: (boolean) Enable default keymaps.  
-  Default is `false`.
-
-  When set to `true`, the plugin provides a set of default keymaps.
-
-  Possible values are:  
-   `true` - Enable default keymaps.  
-   `false` - Disable default keymaps.
-
-### Example Setup
-
-Default configuration:
+#### 更新Neovim
 
 ```lua
-require("nvim_updater").setup({
-  source_dir = "~/.local/src/neovim",  -- Default source directory
-  build_type = "RelWithDebInfo",       -- Default build mode
-  branch = "master",                   -- Represents "nightly"
-  check_for_updates = false,           -- Disable automatic update checks
-  update_interval = (60 * 60) * 6,     -- 6 hours default update interval
-  notify_updates = false,              -- Disable update notifications
-  verbose = false,                     -- Disable verbose output
-  build_fresh = true,                  -- Remove the build directory before compiling
-  default_keymaps = false,              -- Disable default keymaps
+require("nvim_updater").update_neovim({
+  tag = "stable",
+  build_type = "Release",
+  source_dir = "~/.local/src/neovim",
+  force_update = false
 })
 ```
 
----
-
-## ⌨️ Default Keybindings
-
-> [!NOTE]
-> If you do not wish to specify your own custom keymaps,
-> the plugin provides default keymaps that you can use.
-
-- **`<Leader>uU`**: Update Neovim using the default configuration.
-- **`<Leader>uD`**: Update Neovim using a `Debug` build.
-- **`<Leader>uR`**: Update Neovim using a `Release` build type.
-- **`<Leader>uC`**: Remove Neovim source directory.
-- **`<Leader>un`**: Show new updates available
-
-You can override these keybindings by providing a table of
-custom **key mappings** in the plugin’s setup
-(as demonstrated in the installation example).
-
----
-
-## 🔧 Exposed Commands
-
-### Commands
-
-- **`:NVUpdateNeovim`**: Updates Neovim from the source, using the default
-  or custom options you’ve set (e.g., source directory, build type, and branch).
-  If the source does not exist at the specified path,
-  the repository is cloned and built.
-
-  ```vim
-  :NVUpdateNeovim
-  ```
-
-This command pulls the latest changes from the source
-and builds Neovim based on your configuration.
-
-- **`:NVUpdateRemoveSource`**: Removes the source directory.
-
-  ```vim
-  :NVUpdateRemoveSource
-  ```
-
-This command is useful if you want to clean up your source directory
-after you’ve built and installed Neovim.
-
-- **`:NVUpdateShowNewCommits`**: Shows new updates available.
-
-  ```vim
-  :NVUpdateShowNewCommits
-  ```
-
-  This command allows you to check for new updates and show the changes
-  in a floating terminal.
-
-- **`:NVUpdateShowNewCommitsInDiffView`**: Shows new updates available in
-  the [DiffView](https://github.com/sindrets/diffview.nvim) plugin.
-
-  ```vim
-  :NVUpdateShowNewCommitsInDiffView
-  ```
-
-  This command allows you to check for new updates and show the changes
-  in the [DiffView](https://github.com/sindrets/diffview.nvim) plugin.
-
-- **`:NVUpdatePickNewCommits`**: Shows new updates available in
-  the [Telescope](https://github.com/nvim-telescope/telescope.nvim) plugin.
-
-  ```vim
-  :NVUpdatePickNewCommits
-  ```
-
-  This command allows you to check for new updates and show the changes
-  in the [Telescope](https://github.com/nvim-telescope/telescope.nvim) plugin.
-
-### Lua Functions
-
-The plugin exposes several Lua functions.
-
-The following functions are available in the `nvim_updater` namespace:
-
-> [!NOTE]
-> The defaults shown below are for the default configuration.  
-> If options aren't provided to the function, the values from
-> the plugin configuration will be used.
-
-#### Update Neovim from source
+#### 克隆源代码
 
 ```lua
-require("nvim_updater").update_neovim( [options] )
+require("nvim_updater").generate_source_dir({
+  source_dir = "~/.local/src/neovim",
+  tag = "stable"
+})
 ```
 
-Available `[options]`:
-
-- **`source_dir`**: Path to where the Neovim source is cloned. Default is `~/.local/src/neovim`.
-- **`build_type`**: The build type to use, e.g.,
-  `Release`, `Debug`, or `RelWithDebInfo`. Default is `RelWithDebInfo`.
-- **`branch`**: The branch to track when cloning Neovim. Default is `master`.
-
-#### Remove Neovim source
+#### 删除源代码
 
 ```lua
-require("nvim_updater").remove_source_dir( [options] )
+require("nvim_updater").remove_source_dir({
+  source_dir = "~/.local/src/neovim"
+})
 ```
 
-Available `[options]`:
-
-- **`source_dir`**: Path to where the Neovim source is cloned.
-  Default is `~/.local/src/neovim`.
-
-#### Clone Neovim source
+#### 获取状态栏信息
 
 ```lua
-require("nvim_updater").generate_source_dir( [options] )
+local status = require("nvim_updater").get_statusline()
+-- 返回包含count, text, icon, icon_text, icon_count, color的表
 ```
 
-Available `[options]`:
+## 📊 状态栏集成
 
-- **`source_dir`**: Path to where the Neovim source is to be cloned.
-  Default is `~/.local/src/neovim`.
-- **`branch`**: The branch to track when cloning Neovim. Default is `master`.
-
-#### Show new commits
-
-```lua
- require("nvim_updater").show_new_commits( [options] )
-```
-
-This function opens a floating terminal with the new commits/changes on
-the remote repository vs the local src directory.
-
-Available `[options]`:
-
-- `isupdate`: Whether to prompt for updating after showing the changes.
-  Default is `false`
-- `short`: Whether to show short commit messages.
-  Default is `true`
-
-Options may be specified in the following manners:
-
-1. Specify parameters directly: (must follow the same order as shown above)
-
-   ```lua
-   require("nvim_updater").show_new_commits(true, false)
-   ```
-
-2. Use a table: (may be specified in any order or combination)
-
-   ```lua
-   require("nvim_updater").show_new_commits({
-     isupdate = true,
-     short = false
-   })
-   ```
-
-#### Show new commits in DiffView
-
-```lua
- require("nvim_updater").show_new_commits_in_diffview()
-```
-
-This function opens [DiffView](https://github.com/sindrets/diffview.nvim)
-with the new commits/changes on the remote repository vs the local src directory.
-
-#### Show new commits in Telescope
-
-```lua
- require("nvim_updater").show_new_commits_in_telescope()
-```
-
-This function opens [Telescope](https://github.com/nvim-telescope/telescope.nvim)
-with the new commits/changes on the remote repository vs the local src directory.
-
-#### Trigger a notification
-
-```lua
-require("nvim_updater").notify_new_commits( [options] )
-```
-
-This function triggers a notification with the new commits/changes on
-the remote repository vs the local src directory.
-
-Available `[options]`:
-
-- `show_none`: Whether to show a notification when there are no new commits.
-  Default is `false`
-
-- `level`: The level of notification to use.
-  Default is `INFO`.  
-  Possible values are: `INFO`, `WARN`, `ERROR`, `DEBUG`.
-
-#### Open floating terminal
-
-```lua
-require("nvim_updater.utils").open_floating_terminal( [TerminalOptions] )
-```
-
-This is a helper function for opening a floating terminal that is used by the
-updater to display the terminal output.
-
-Available `[TerminalOptions]`:
-
-- **`cmd`**: Command to run in the terminal.
-- **`filetype`**: Filetype to assign to the terminal buffer.
-  Default is `"nvim_updater_term"`.
-- **`ispreupdate`**: (Deprecated)
-  Whether the terminal will be followed by an update build.
-  Default is `false`.
-- **`autoclose`**: Whether the terminal buffer will be closed when the process ends.
-  Default is `false`.
-- **`enter_insert`**: Whether the terminal should start in insert mode and maintain it when focused.
-  Default is `false`.
-- **`callback`**: A function to call when the terminal buffer is closed.
-  Default is `nil`.
-
-  > [!NOTE]  
-  > The `ispreupdate` option is now deprecated and will be removed in a future version.
-
-  ##### Callback Function
-
-  The callback function allows you to define a function to be triggered when the
-  terminal buffer is closed.
-
-  The callback function is called with the following arguments:
-
-  - `ev`: The [event object](https://neovim.io/doc/user/api.html#event-args)
-    received from the terminal close event.
-  - `exit_code`: The exit code of the process that was run in the terminal buffer.
-  - `output`: The output of the process that was run in the terminal buffer.
-
-  In most cases, this will occur after the process has completed.
-
-  However, if the window is closed before the process is complete, the exit code
-  returned will be `-1`. This allows us to identify those scenarios and handle them
-  appropriately.
-
-  Here is an example of how to use the callback function:
-
-  ```lua
-  require("nvim_updater.utils").open_floating_terminal({
-    command = "my_test_script.sh", -- Command to run
-    filetype = "my_test_script_term", -- Filetype to assign
-    autoclose = true, -- Close the terminal buffer automatically
-    callback = function(result) -- Callback function
-      if result.result_code == -1 then
-        vim.notify(
-          "Terminal closed before process completed",
-          vim.log.levels.ERROR
-        )
-      elseif result.result_code == 0 then
-        vim.notify(
-          "Terminal process completed successfully",
-          vim.log.levels.INFO
-        )
-      else
-        vim.notify(
-          "Terminal process failed with exit code: " .. result.result_code,
-          vim.log.levels.ERROR
-        )
-      end
-    end,
-  })
-  ```
-
-#### Setup
-
-```lua
-require("nvim_updater").setup( [options] )
-```
-
-See [Configuration](⚙️Configuration) for setup `[options]`.
-
----
-
-## 📂 Integrations
-
-There are several features that allow the plugin to better integrate with other plugins.
-
-### Filetype: `neovim_updater_term`
-
-The plugin assigns a custom **filetype** to the terminal buffer
-used to run shell commands for updating Neovim.
-
-You can easily integrate with statusline plugins like **lualine** by referencing
-this **filetype** and applying custom conditions.
-For example, you may want to hide certain lualine components when
-this filetype is active in your terminal buffers.
-
-#### Example Lualine Configuration
-
-```lua
-require("lualine").setup {
-  sections = {
-    lualine_a = { "mode" },
-    lualine_b = { "branch" },
-    lualine_c = {
-      { -- Hide filename when using the updater
-        "filename",
-        cond = function()
-          return not string.find(vim.bo.filetype, "neovim_updater_term")
-        end,
-      },
-      { -- Neovim Updater
-        function()
-          local ft = vim.bo.filetype
-          if ft == "neovim_updater_term.updating" then
-            return "Neovim Updating.."
-          elseif ft == "neovim_updater_term.cloning" then
-            return "Neovim Source Cloning.."
-          elseif ft == "neovim_updater_term.changes" then
-            return "Neovim Source Changelog"
-          end
-        end,
-        icon = "󰅢 ",
-        color = "lualine_a_terminal",
-        separator = { left = "", right = "" },
-        padding = { left = 0, right = 0 },
-        cond = function()
-          return string.find(vim.bo.filetype, "neovim_updater_term") ~= nil
-        end,
-      },
-  },
-  -- Other lualine components
-}
-```
-
-This configuration hides the file name in lualine when
-the `neovim_updater_term` root filetype is detected and
-shows the `nvim-updater` component instead.
-
-In this way we can avoid a messy "filename" being displayed
-when using the updater and instead display a customized
-"Neovim Updating" message.
-
-The condition can also be applied to any other components you
-wish to hide when using the updater.
-
-We can also take advantage of the "sub-filetype" to determine
-the mode of the updater plugin.
-
-The plugin exposes the following sub-filetypes:
-
-- `neovim_updater_term.updating` - Neovim is updating
-- `neovim_updater_term.changes` - Showing Neovim source changes
-- `neovim_updater_term.cloning` - Neovim source directory is cloning
-
-### 🪄 Statusline Integration
-
-The plugin exposes a function `nvim_updater.get_statusline()`
-
-This function returns a table of values that can be used to
-populate your statusline component.
-
-The table is **not** updated when the function is called.
-This prevents blocking or caching from negatively impacting your status component.
-
-Instead, set the `check_for_updates` option to `true` and configure a
-`update_interval` in the plugin setup options. The plugin will then
-periodically check for updates and update the statusline component
-automatically at that interval.
-
-Alternatively, set `check_for_updates` to `false` and manually
-call `nvim_updater.utils.get_commit_count()` when you'd like to
-refresh the updates.
-
-Here is an example adding a component to the lualine statusline:
+### Lualine集成示例
 
 ```lua
 require("lualine").setup {
   sections = {
     lualine_x = {
-      { -- Neovim Updater Status
+      {
         function()
           return require("nvim_updater").get_statusline().icon_text
         end,
@@ -650,10 +240,7 @@ require("lualine").setup {
           return require("nvim_updater").get_statusline().color
         end,
         on_click = function()
-          require("nvim_updater").show_new_commits({
-            isupdate = true, -- Update after showing changes
-            short = true, -- Use short commit messages
-          })
+          require("nvim_updater").update_neovim()
         end,
       },
     },
@@ -661,107 +248,38 @@ require("lualine").setup {
 }
 ```
 
-This will produce statusline components like this:
+### 文件类型集成
 
-![Lualine up-to-date](https://github.com/user-attachments/assets/9e57c41b-cb1c-419a-828c-4399919af980)
+插件为终端缓冲区分配自定义文件类型：
 
-![Lualine has-updates](https://github.com/user-attachments/assets/7b0cb567-23ad-4b83-8aae-2a0e0eedf724)
+- `neovim_updater_term.building` - 构建过程中
+- `neovim_updater_term.cloning` - 克隆过程中
+- `neovim_updater_term.switching` - 切换版本中
+- `neovim_updater_term.updating_source` - 更新源代码中
 
-Clicking on the component will open the changelog in a floating terminal.
+## 🔄 外部使用
 
-The `get_statusline()` function provides the following values:
+### 命令行集成
 
-- count: The number of new commits
-- text: The text of the status
-- icon: An icon representing the update status
-- icon_text: The icon and text of the status
-- icon_count: The icon and count of the status
-- color: A highlight group representing the update status
+设置环境变量`NVIMUPDATER_HEADLESS=1`可以在命令行中直接使用：
 
-### Diff Integrations
-
-The plugin exposes a couple additional functions that provide better
-integration with other plugins.
-
-#### DiffView Integration
-
-The plugin exposes a function `nvim_updater.show_new_commits_in_diffview()`
-
-This function opens the changelog in
-the [DiffView](https://github.com/sindrets/diffview.nvim) plugin.
-
-If the plugin is not installed/available, the function will produce an error
-notification and then fallback to opening the changelog in a floating terminal.
-
-#### Telescope Integration
-
-The plugin exposes a function `nvim_updater.show_new_commits_in_telescope()`
-
-This function opens the changelog in
-the [Telescope](https://github.com/nvim-telescope/telescope.nvim) plugin.
-
-If the plugin is not installed/available, the function will produce an error
-notification and then fallback to opening the changelog in a floating terminal.
-
----
-
-## 🧰 External Use
-
-You can also use this plugin to update Neovim directly from
-the command line or from the desktop.
-
-This is achieved by the use of an environment variable.
-
-The `NVIMUPDATER_HEADLESS` environment variable can be set
-to enable headless mode. In this mode, Neovim will be exited
-immediately after the update completes.
-
-> [!WARNING]
-> Lazy-loading the plugin may prevent headless
-> operation from functioning properly.
-
-If you receive an error with external calls:
-
-```vim
-E492: Not an editor command: NVUpdateNeovim
-```
-
-This generally indicates the plugin was not loaded at startup.
-
-### Command Line
-
-After installing the plugin, you can run the following command:
-
-```sh
+```bash
 NVIMUPDATER_HEADLESS=1 nvim "+NVUpdateNeovim"
 ```
 
-This command will open Neovim directly to the updater.
-
-- If the update completes successfully, Neovim will be closed.
-- If the update fails, the window will be kept open.
-
-You can also alias this command to a shortcut like `nvimup`:
-
-**bash/zsh**:
+创建别名简化使用：
 
 ```bash
+# Bash/Zsh
 alias nvimup='NVIMUPDATER_HEADLESS=1 nvim "+NVUpdateNeovim"'
-```
 
-**fish**:
-
-```fish
+# Fish
 alias --save nvimup='NVIMUPDATER_HEADLESS=1 nvim "+NVUpdateNeovim"'
 ```
 
-This will allow you to simply run `nvimup` from anywhere in your terminal.
+### 桌面快捷方式
 
-### Desktop Shortcut
-
-You can also create a desktop shortcut for this command like so:
-
-**nvimup.desktop**:
+创建桌面文件`~/.local/share/applications/nvimup.desktop`：
 
 ```desktop
 [Desktop Entry]
@@ -772,67 +290,81 @@ Type=Application
 Icon=nvim
 ```
 
-Place this file in your `~/.local/share/applications` directory.
+## 🔍 健康检查
 
-You will then have a shortcut available in your system's application menu
-for updating Neovim called  
-`Neovim Updater`. This shortcut will open the updater in your
-default terminal emulator.
+运行以下命令检查插件状态：
 
-To use a specific terminal emulator instead of the default,
-you can modify the desktop file like so:
-
-**kitty-nvimup.desktop**:
-
-```desktop
-[Desktop Entry]
-Name=Neovim Updater (kitty)
-Exec=env NVIMUPDATER_HEADLESS=1 kitty nvim "+NVUpdateNeovim"
-Terminal=false
-Type=Application
-Icon=nvim
+```vim
+:checkhealth nvim_updater
 ```
 
-This example uses the `kitty` terminal emulator.
+健康检查会验证：
 
-You can substitute `kitty` with any terminal emulator of your choice.
+- Neovim版本兼容性
+- 源代码目录状态
+- 目录写权限
+- 远程标签有效性
+
+## ⚡ 性能优化
+
+### 浅克隆优化
+
+当启用`use_shallow_clone = true`时，插件使用智能克隆策略：
+
+1. **分支优化**: 直接克隆目标分支(`--single-branch --depth 1`)
+2. **标签优化**: 浅克隆后获取特定标签
+3. **降级策略**: 必要时回退到完整克隆
+
+### 环境变量配置
+
+通过`env`选项传递额外的环境变量：
+
+```lua
+require("nvim_updater").setup({
+  env = {
+    CMAKE_BUILD_TYPE = "Release",
+    MAKEFLAGS = "-j4",  -- 并行编译
+  }
+})
+```
+
+## 🛡️ 兼容性说明
+
+- **平台支持**: 主要针对Linux环境开发，使用`sudo make install`
+- **Neovim版本**: 需要0.9+，推荐0.10+以获得最佳体验
+- **Git要求**: 需要现代Git版本支持浅克隆和switch命令
+
+## 🤝 贡献指南
+
+欢迎提交Issues和Pull Requests！
+
+### 报告问题时请包含
+
+1. `nvim --version`的输出
+2. 详细的错误信息
+3. 重现步骤
+4. 系统环境信息
+
+### Pull Request指南
+
+1. Fork此仓库
+2. 创建功能分支
+3. 确保代码经过测试
+4. 提交PR并详细描述更改
+
+## 📝 许可证
+
+本项目采用[MIT许可证](LICENSE)。
 
 ---
 
-## ⚠️ Compatibility
+## 🙏 致谢
 
-- **Platform:** The plugin is primarily developed for Linux environments.
-  Although it may work on macOS or other platforms,
-  `sudo make install` is hard-coded and assumes a Linux-based setup.
-- **Neovim Version:** This plugin requires **Neovim 0.9+** to operate correctly,
-  as it depends on specific Lua API features.
+感谢所有贡献者和Neovim社区的支持。
 
----
+<div align="center">
 
-## 🛠️ Contributing
+**[⬆ 回到顶部](#nvim-updaternvim)**
 
-If you find any issues or have suggestions for improvement,
-feel free to open a GitHub issue or send a pull request.
-We welcome contributions!
+</div>
 
-### 🐛 Filing an Issue
-
-Be sure to include the following information when reporting bugs:
-
-1. The output of `nvim --version`.
-2. Error messages from Neovim (if any).
-3. Steps to reproduce the issue.
-
-### 🚀 PR Submission Guidelines
-
-1. Fork the repository.
-2. Create a new branch for your feature or fix.
-3. Make your changes, add or update tests, and confirm everything works.
-4. Submit a **pull request** with a clear description of the changes made.
-
----
-
-## 📜 License
-
-This repository is licensed under the [MIT License](LICENSE).  
-You are free to use, modify, and distribute this project in your own work.
